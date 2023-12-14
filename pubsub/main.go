@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,6 +20,17 @@ func init() {
 	})))
 }
 
+type PubSubMessage struct {
+	Message struct {
+		Data        []byte            `json:"data,omitempty"`
+		MessageId   string            `json:"messageId"`
+		PublishTime time.Time         `json:"publishTime"`
+		Attributes  map[string]string `json:"attributes,omitempty"`
+		OrderingKey string            `json:"orderingKey,omitempty"`
+	} `json:"message"`
+	Subscription string `json:"subscription"`
+}
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt, os.Kill)
 	defer stop()
@@ -34,14 +44,21 @@ func main() {
 	echoServer := &http.Server{
 		Addr: ":" + port,
 		Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			if buf, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, request.Body)); err != nil {
-
-			} else {
-				slog.DebugContext(request.Context(), string(buf), "headers", request.Header)
-
-				_, _ = fmt.Fprintln(writer, "Header", request)
-				_, _ = fmt.Fprintln(writer, "Body", string(buf))
+			var e PubSubMessage
+			if err := json.NewDecoder(request.Body).Decode(&e); err != nil {
+				http.Error(writer, "Bad HTTP Request", http.StatusBadRequest)
+				slog.Error(fmt.Sprintf("Bad HTTP Request: %v", http.StatusBadRequest), "error", err)
+				return
 			}
+			slog.DebugContext(request.Context(), "Event Received",
+				"headers", request.Header,
+				"event", e,
+				"data", string(e.Message.Data),
+			)
+
+			_, _ = fmt.Fprintln(writer, "Header", request.Header)
+			_, _ = fmt.Fprintln(writer, "event", e)
+			_, _ = fmt.Fprintln(writer, "data", string(e.Message.Data))
 		}),
 	}
 
