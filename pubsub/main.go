@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -44,13 +45,15 @@ func main() {
 
 	go func() {
 		slog.Debug(fmt.Sprintf("Listening on port %s", port))
-		if err := echoServer.ListenAndServe(); err != nil {
+		if err := echoServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error(err.Error())
 			os.Exit(1)
 		}
 	}()
 
 	<-ctx.Done()
+
+	slog.Debug("Shutting down server")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
