@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -9,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 )
@@ -34,12 +34,14 @@ func main() {
 	echoServer := &http.Server{
 		Addr: ":" + port,
 		Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			var buf strings.Builder
-			_, _ = io.Copy(&buf, request.Body)
-			slog.DebugContext(request.Context(), buf.String(), "Ce-Id", request.Header.Get("Ce-Id"))
+			if buf, err := io.ReadAll(base64.NewDecoder(base64.StdEncoding, request.Body)); err != nil {
 
-			_, _ = fmt.Fprintln(writer, "Ce-Id: %s", request.Header.Get("Ce-Id"))
-			_, _ = fmt.Fprintln(writer, buf.String())
+			} else {
+				slog.DebugContext(request.Context(), string(buf), "headers", request.Header)
+
+				_, _ = fmt.Fprintln(writer, "Header", request)
+				_, _ = fmt.Fprintln(writer, "Body", string(buf))
+			}
 		}),
 	}
 
