@@ -59,20 +59,7 @@ resource "google_compute_firewall" "flask" {
   source_ranges = ["0.0.0.0/0"]
 }
 
-data "google_project" "project" {
-}
-
 // A variable for extracting the external IP address of the VM
 output "Web-server-URL" {
   value = join("", ["http://", google_compute_instance.default.network_interface.0.access_config.0.nat_ip, ":5000"])
-}
-
-resource "google_storage_bucket" "default" {
-  name          = "${data.google_project.project.name}-bucket-tfstate"
-  force_destroy = false
-  location      = "ASIA"
-  storage_class = "STANDARD"
-  versioning {
-    enabled = true
-  }
 }
